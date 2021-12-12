@@ -4,6 +4,7 @@ import sys
 import getopt
 import os
 import time
+import traceback
 import datetime
 import pytube.request
 import curses
@@ -114,10 +115,7 @@ def search(query : str,path : str,mp3 : bool):
                 search.get_next_results()
             win.window.addstr(y-1,0,"Processing...                                                 ")
             win.window.refresh()
-            try:
-                win.showinfo(res[index],index,len(res))
-            except Exception as e:
-                print(e)
+            win.showinfo(res[index],index,len(res))
         elif ch in [ord('d'),ord('D')]:
             y,x = win.window.getmaxyx()
             win.window.attron(curses.color_pair(5) | curses.A_BOLD)
@@ -162,46 +160,48 @@ def info(link : str):
     printcol("Creation date",yt.publish_date.strftime("%b %d %Y"))
     printcol("Description",yt.description)
 
-
-path = os.getcwd()
-mp3 = False
-link = None
-query = None
-opts, args = getopt.getopt(sys.argv[1:],"hd:vml:q:",["help","installdir=","version","mp3","link=","query="])
-for o, a in opts:
-    if o in ("-h","--help"):
-        print(helppage)
+try:
+    path = os.getcwd()
+    mp3 = False
+    link = None
+    query = None
+    opts, args = getopt.getopt(sys.argv[1:],"hd:vml:q:",["help","installdir=","version","mp3","link=","query="])
+    for o, a in opts:
+        if o in ("-h","--help"):
+            print(helppage)
+            exit(0)
+        elif o in ("-d","--installdir"):
+            path = a
+        elif o in ("-v","--version"):
+            print("ytload version 0.1.0")
+        elif o in ("-m","--mp3"):
+            mp3 = True
+        elif o in ("-l","--link"):
+            link = a
+        elif o in ("-q","--query"):
+            query = a
+    if len(args) == 0:
+        print(cld(160)+"Please enter an argument."+rs)
         exit(0)
-    elif o in ("-d","--installdir"):
-        path = a
-    elif o in ("-v","--version"):
-        print("ytload version 0.1.0")
-    elif o in ("-m","--mp3"):
-        mp3 = True
-    elif o in ("-l","--link"):
-        link = a
-    elif o in ("-q","--query"):
-        query = a
-if len(args) == 0:
-    print(cld(160)+"Please enter an argument."+rs)
-    exit(0)
-if args[0] == "download":
-    if link is None:
-        print(cld(160)+"Please enter a link."+rs)
-        exit(3)
+    if args[0] == "download":
+        if link is None:
+            print(cld(160)+"Please enter a link."+rs)
+            exit(3)
 
-    download(path,link,mp3)   
-elif args[0] == "info":
-    if link is None:
-        print(cld(160)+"Please enter a link."+rs)
-        exit(2)
-    info(link)
-elif args[0] == "search":
-    if len(args) > 1:
-        query = " ".join(args[1::])
-    if query is None:
-        print(cld(160)+"Please enter a query."+rs)
-        exit(2)
-    search(query,path,mp3)
-
+        download(path,link,mp3)   
+    elif args[0] == "info":
+        if link is None:
+            print(cld(160)+"Please enter a link."+rs)
+            exit(2)
+        info(link)
+    elif args[0] == "search":
+        if len(args) > 1:
+            query = " ".join(args[1::])
+        if query is None:
+            print(cld(160)+"Please enter a query."+rs)
+            exit(2)
+        search(query,path,mp3)
+except:
+    curses.endwin()
+    traceback.print_exception(*sys.exc_info())
 
