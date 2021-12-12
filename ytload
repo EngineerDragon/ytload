@@ -113,17 +113,18 @@ def search(query : str,path : str,mp3 : bool):
             index += 1
             if index == len(res):
                 search.get_next_results()
-            win.window.addstr(y-1,0,"Processing...                                                 ")
+            
+            win.window.addstr(y-1,0,"Processing...                         ")
             win.window.refresh()
             win.showinfo(res[index],index,len(res))
         elif ch in [ord('d'),ord('D')]:
             y,x = win.window.getmaxyx()
             win.window.attron(curses.color_pair(5) | curses.A_BOLD)
-            win.window.addstr(y-1,0,"Getting ready to download...                                    ")
+            win.window.addstr(y-1,0,"Getting ready to download...          ")
             win.window.refresh()
             stream = None
             def progress_func(chunk,file_handle, bytes_remaining):
-                win.window.addstr(y-1,0,"Downloading... {:.2f}%                            ".format((1-(bytes_remaining/stream.filesize))*100))
+                win.window.addstr(y-1,0,"Downloading... {:.2f}%                ".format((1-(bytes_remaining/stream.filesize))*100))
                 win.window.refresh()
             def on_comp(s,p):
                 curses.endwin()
