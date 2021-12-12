@@ -1,0 +1,227 @@
+#!/usr/bin/python3
+import pytube
+import sys
+import getopt
+import os
+import time
+import datetime
+import pytube.request
+import curses
+
+pytube.request.default_range_size = 524288
+
+helppage = """Usage : ytload [action] [options]  ...
+ytload is an utility tool for downloading videos from youtube.
+Actions:
+   download                         Downloads the specified link as specified format.
+   search                           Searches for the specified string.
+   info                             Gets the video of the specified link
+Options:
+  -h, --help                        Print this message and exit.
+  -d [DIR], --installdir=DIR        Sets the install directory.
+  -v, --version                     Prints the current version of the program.
+  -m, --mp3                         If download is selected get the video as a mp3 file.
+  -l [LINK], --link=LINK            Link argument for actions.
+  -q [QUERY], --query=QUERY         Query argument for search."""
+
+
+
+def cld(a:int): 
+    return f"\033[38;5;{a}m"
+rs = "\033[m"
+
+def parselist(string,w):
+    lis = string.split("\n")
+    l = []
+    for i in lis:
+        d = [i[j:j+w] for j in range(0, len(i), w)]
+        l.extend(d)
+    return l
+
+class QueryWindow:
+    def __init__(self):
+        self.window = curses.initscr()
+        curses.noecho()
+        curses.cbreak()
+        self.window.keypad(True)
+        curses.start_color()
+        curses.curs_set(0)
+        curses.init_pair(1,curses.COLOR_GREEN,curses.COLOR_BLACK) # border color
+        curses.init_pair(2,curses.COLOR_BLUE,curses.COLOR_BLACK) ## a color
+        curses.init_pair(3,154,curses.COLOR_BLACK) ## Res color
+        curses.init_pair(4,140,curses.COLOR_BLACK)
+        curses.init_pair(5,193,curses.COLOR_BLACK)
+        self.window.clear()
+        self.window.refresh()
+
+    def showinfo(self,result,idx,leen):
+        try:
+            self.window.clear()
+            y,x = self.window.getmaxyx()
+            def write_text(y,x,t1,t2):
+                self.window.attron(curses.color_pair(2) | curses.A_BOLD)
+                self.window.addstr(y,x,t1)
+                self.window.attron(curses.color_pair(3) | curses.A_BOLD)
+                self.window.addch(y,x + len(t1) + 1,":")
+                self.window.attron(curses.color_pair(4) | curses.A_BOLD)
+                self.window.addstr(y,x + len(t1) + 3,t2)
+            self.window.attron(curses.color_pair(1) | curses.A_BOLD)
+        #  self.window.hline(0,0,' ',x+1)
+            self.window.border(' ',' ',0,' ',curses.ACS_HLINE,curses.ACS_HLINE,' ',' ')
+            textsr = "Search Results"
+            self.window.addstr(0,(x - len(textsr))//2,"Search Results")
+            self.window.addstr(0,1,f"{idx+1} of {leen+1}")
+            write_text(1,0,"Title",result.title)
+            write_text(2,0,"Creator",result.author)
+            write_text(3,0,"Duration",str(datetime.timedelta(seconds=result.length)))
+            write_text(4,0,"Rating",str(result.rating))
+            write_text(5,0,"View count",str(result.views))
+            write_text(6,0,"Creation date",result.publish_date.strftime("%b %d %Y"))
+            l = parselist(result.description,x)
+            write_text(7,0,"Description",l[0])
+            for idx,val in enumerate(l[1::]):
+                if idx + 9 == y:
+                    break
+                self.window.addstr(idx+8,0,val)
+            self.window.attron(curses.color_pair(1))
+            self.window.addstr(y-1,0,"D Download  N Next  P Previous  Q Quit")
+            self.window.refresh()
+        except Exception as e:
+            print(str(e))
+
+
+    def __del__(self):
+        curses.nocbreak()
+        curses.echo()
+        curses.endwin()
+
+def search(query : str,path : str,mp3 : bool):
+    print(cld(112)+"Searching for results...")
+    search = pytube.contrib.search.Search(query)
+    res = search.results
+    index = 0
+    win = QueryWindow()
+    win.showinfo(res[0],index,len(res))
+    while True:
+        ch = win.window.getch()
+        if ch in [ord('p'),ord('P')]:
+            index = max(index-1,0)
+            win.showinfo(res[index],index,len(res))
+        elif ch in [ord('q'),ord('Q')]:
+            exit(0)
+        elif ch in [ord('n'),ord('N')]:
+            y,x = win.window.getmaxyx()
+           # curses.setsyx(y-1,0)
+          #  win.window.clrtoeol()
+            index += 1
+            if index == len(res):
+                search.get_next_results()
+            win.window.addstr(y-1,0,"Processing...                                                 ")
+            win.window.refresh()
+            win.showinfo(res[index],index,len(res))
+        elif ch in [ord('d'),ord('D')]:
+            y,x = win.window.getmaxyx()
+            win.window.attron(curses.color_pair(5) | curses.A_BOLD)
+            win.window.addstr(y-1,0,"Getting ready to download...                                    ")
+            win.window.refresh()
+            stream = None
+            def progress_func(chunk,file_handle, bytes_remaining):
+                win.window.addstr(y-1,0,"Downloading... {:.2f}%                            ".format((1-(bytes_remaining/stream.filesize))*100))
+                win.window.refresh()
+            def on_comp(s,p):
+                curses.endwin()
+                print(cld(193)+"The video has been downloaded successfully!"+rs)
+                exit(0)
+            res[index].register_on_progress_callback(progress_func)
+            res[index].register_on_complete_callback(on_comp)
+            stream = res[index].streams.filter(progressive=True,file_extension="mp4").order_by("resolution").desc().first()
+            try:
+                stream.download()
+            except Exception as e:
+                curses.endwin()
+                print(cld(190)+f"Some error occured.\n"+str(e)+rs)
+                exit(1)
+
+def download(path : str,link : str,a : bool):
+    stream = None
+    def progress_func(chunk,file_handle, bytes_remaining):
+        print(cld(34) + "Downloaded {:.2f}%".format((1-(bytes_remaining/stream.filesize))*100) + rs,end="\r")
+    yt = pytube.YouTube(link,on_progress_callback=progress_func)
+    stream = yt.streams.filter(progressive=True,file_extension="mp4").order_by("resolution").desc().first()
+    print(cld(93)+yt.title+"\nDuration : " + str(datetime.timedelta(seconds=yt.length))+"\n"+rs+cld(10)+"\nDownloading..."+rs)
+    stream.download()
+    print(cld(112)+"The video has been downloaded successfully!\n"+rs)
+    pass
+
+
+def info(link : str):
+    yt = pytube.YouTube(link)
+    yt.check_availability()
+    def printcol(a : str,b : str):
+        print(cld(164)+a+cld(178)+" : "+cld(40)+b+rs)
+    print("\n"+cld(99)+"Video information :"+rs+"\n")
+    printcol("Title",yt.title)
+    printcol("Creator",yt.author)
+    printcol("Duration",str(datetime.timedelta(seconds=yt.length)))
+    printcol("Rating",str(yt.rating))
+    printcol("View count",str(yt.views))
+    printcol("Creation date",yt.publish_date.strftime("%b %d %Y"))
+    printcol("Description",yt.description)
+
+try:
+    path = os.getcwd()
+    mp3 = False
+    link = None
+    query = None
+    opts, args = getopt.getopt(sys.argv[1:],"hd:vml:q:",["help","installdir=","version","mp3","link=","query="])
+    for o, a in opts:
+        if o in ("-h","--help"):
+            print(helppage)
+            exit(0)
+        elif o in ("-d","--installdir"):
+            path = a
+        elif o in ("-v","--version"):
+            print("ytload version 0.1.0")
+        elif o in ("-m","--mp3"):
+            mp3 = True
+        elif o in ("-l","--link"):
+            link = a
+        elif o in ("-q","--query"):
+            query = a
+    if len(args) == 0:
+        print(cld(160)+"Please enter an argument."+rs)
+        exit(0)
+    if args[0] == "download":
+        if link is None:
+            print(cld(160)+"Please enter a link."+rs)
+            exit(3)
+        try:
+            download(path,link,mp3)
+        except Exception as e:
+            print(cld(160)+str(e)+rs)
+            exit(10)
+    elif args[0] == "info":
+        if link is None:
+            print(cld(160)+"Please enter a link."+rs)
+            exit(2)
+        try:
+            info(link)
+        except Exception as e:
+            print(cld(160)+str(e)+rs)
+            exit(10)
+    elif args[0] == "search":
+        if len(args) > 1:
+            query = " ".join(args[1::])
+        if query is None:
+            print(cld(160)+"Please enter a query."+rs)
+            exit(2)
+        search(query,path,mp3)
+
+except getopt.GetoptError as e:
+    print(cld(160)+str(e)+rs)
+    exit(1)
+except Exception as e:
+    print(cld(160)+str(e)+rs)
+    exit(1)
+
+
