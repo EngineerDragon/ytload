@@ -79,11 +79,12 @@ class QueryWindow:
         write_text(5,0,"View count",str(result.views))
         write_text(6,0,"Creation date",result.publish_date.strftime("%b %d %Y"))
         l = parselist(result.description,x)
-        write_text(7,0,"Description",l[0])
-        for idx,val in enumerate(l[1::]):
-            if idx + 9 == y:
-                break
-            self.window.addstr(idx+8,0,val)
+        if len(l) != 0:
+            write_text(7,0,"Description",l[0])
+            for idx,val in enumerate(l[1::]):
+                if idx + 9 == y:
+                    break
+                self.window.addstr(idx+8,0,val)
         self.window.attron(curses.color_pair(1))
         self.window.addstr(y-1,0,"D Download  N Next  P Previous  Q Quit")
         self.window.refresh()
@@ -202,6 +203,8 @@ try:
             print(cld(160)+"Please enter a query."+rs)
             exit(2)
         search(query,path,mp3)
+except SystemExit as e:
+    pass
 except:
     curses.endwin()
     traceback.print_exception(*sys.exc_info())
