@@ -49,9 +49,9 @@ class QueryWindow:
         curses.curs_set(0)
         curses.init_pair(1,curses.COLOR_GREEN,curses.COLOR_BLACK) # border color
         curses.init_pair(2,curses.COLOR_BLUE,curses.COLOR_BLACK) ## a color
-        curses.init_pair(3,154,curses.COLOR_BLACK) ## Res color
-        curses.init_pair(4,140,curses.COLOR_BLACK)
-        curses.init_pair(5,193,curses.COLOR_BLACK)
+        curses.init_pair(3,4,curses.COLOR_BLACK) ## Res color
+        curses.init_pair(4,3,curses.COLOR_BLACK)
+        curses.init_pair(5,2,curses.COLOR_BLACK)
         self.window.clear()
         self.window.refresh()
 
